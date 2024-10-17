@@ -2,6 +2,7 @@
 #include <format>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <liburing.h>
 #include <btrfs/ioctl.h>
 #include "unique_fd.h"
@@ -96,7 +97,40 @@ static unique_fd init_io_uring() {
     return iou;
 }
 
-static void do_test(int iou, const string& fn) {
+static void ioctl_read_test(const string& fn) {
+    int ret;
+    unique_fd fd;
+    char buf[131072];
+    struct iovec iov;
+    btrfs_ioctl_encoded_io_args enc;
+
+    ret = open(fn.c_str(), O_RDONLY | O_DIRECT);
+    if (ret < 0)
+        throw runtime_error("open failed");
+    fd.reset(ret);
+
+    iov.iov_base = buf;
+    iov.iov_len = sizeof(buf);
+
+    enc.iov = &iov;
+    enc.iovcnt = 1;
+    enc.offset = 0;
+    enc.flags = 0;
+
+    ret = ioctl(fd.get(), BTRFS_IOC_ENCODED_READ, &enc);
+
+    cout << format("ret = {}, errno = {}\n", ret, errno);
+
+    if (ret < 0)
+        return;
+
+    cout << format("len {}, unencoded_len {}, unencoded_offset {}, compression {}, encryption {}\n",
+                   enc.len, enc.unencoded_len, enc.unencoded_offset, enc.compression, enc.encryption);
+
+    // FIXME
+}
+
+static void io_uring_read_test(int iou, const string& fn) {
     int ret;
     unique_fd fd;
     unsigned int tail, next_tail, index;
@@ -198,7 +232,9 @@ int main(int argc, char* argv[]) {
         auto iou = init_io_uring();
 
         for (int i = 1; i < argc; i++) {
-            do_test(iou.get(), argv[i]);
+            ioctl_read_test(argv[i]);
+
+            io_uring_read_test(iou.get(), argv[i]);
 
             cout << "waiting" << endl;
             fflush(stdout);
