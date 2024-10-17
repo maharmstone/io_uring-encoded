@@ -6,4 +6,4 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 find_package(PkgConfig REQUIRED)
 
-add_executable(test src/test.cpp)
+add_executable(read-test src/read-test.cpp)
