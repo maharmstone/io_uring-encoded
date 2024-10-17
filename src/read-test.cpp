@@ -227,8 +227,104 @@ static void read_from_cq() {
     write_barrier();
 }
 
+extern uint8_t dump_normal;
+extern uint64_t dump_normal_length;
+extern uint8_t dump_zlib;
+extern uint64_t dump_zlib_length;
+extern uint8_t dump_lzo;
+extern uint64_t dump_lzo_length;
+extern uint8_t dump_zstd;
+extern uint64_t dump_zstd_length;
+
+static constexpr uint64_t round_up(uint64_t n) {
+    if (n & 0xfff)
+        n = (n & ~0xfff) + 0x1000;
+
+    return n;
+}
+
+struct test_item {
+    const char* name;
+    span<const uint8_t> data;
+    uint64_t len;
+    uint64_t unencoded_len;
+    uint64_t unencoded_offset;
+    uint32_t compression;
+};
+
+static const test_item test_items[] = {
+    { "normal.txt", span(&dump_normal, dump_normal_length), dump_normal_length, dump_normal_length, 0, 0 },
+    { "zlib.txt", span(&dump_zlib, dump_zlib_length), dump_normal_length, round_up(dump_normal_length), 0, 1 },
+    { "lzo.txt", span(&dump_lzo, dump_lzo_length), dump_normal_length, round_up(dump_normal_length), 0, 3 },
+    { "zstd.txt", span(&dump_zstd, dump_zstd_length), dump_normal_length, round_up(dump_normal_length), 0, 2 }
+};
+
+static void do_ioctl_tests() {
+    for (const auto& i : test_items) {
+        int ret;
+        unique_fd fd;
+        char buf[131072];
+        struct iovec iov;
+        btrfs_ioctl_encoded_io_args enc;
+
+        ret = open(i.name, O_RDONLY | O_DIRECT);
+        if (ret < 0)
+            throw runtime_error("open failed");
+        fd.reset(ret);
+
+        iov.iov_base = buf;
+        iov.iov_len = sizeof(buf);
+
+        enc.iov = &iov;
+        enc.iovcnt = 1;
+        enc.offset = 0;
+        enc.flags = 0;
+
+        ret = ioctl(fd.get(), BTRFS_IOC_ENCODED_READ, &enc);
+
+        if (ret < 0)
+            cerr << format("{}: ioctl failed (ret {}, errno {})\n", i.name, ret, errno);
+        else if (ret != i.data.size())
+            cerr << format("{}: ioctl returned {}, expected {}\n", i.name, ret, i.data.size());
+
+        if (ret == i.data.size()) {
+            bool okay = true;
+
+            if (enc.len != i.len) {
+                cerr << format("{}: ioctl enc.len was {}, expected {}\n", i.name, enc.len, i.len);
+                okay = false;
+            }
+
+            if (enc.unencoded_len != i.unencoded_len) {
+                cerr << format("{}: ioctl enc.unencoded_len was {}, expected {}\n", i.name, enc.unencoded_len, i.unencoded_len);
+                okay = false;
+            }
+
+            if (enc.unencoded_offset != i.unencoded_offset) {
+                cerr << format("{}: ioctl enc.unencoded_offset was {}, expected {}\n", i.name, enc.unencoded_offset, i.unencoded_offset);
+                okay = false;
+            }
+
+            if (enc.compression != i.compression) {
+                cerr << format("{}: ioctl enc.compression was {}, expected {}\n", i.name, enc.compression, i.compression);
+                okay = false;
+            }
+
+            if (enc.encryption != 0) {
+                cerr << format("{}: ioctl enc.encryption was {}, expected 0\n", i.name, enc.encryption);
+                okay = false;
+            }
+
+            if (okay)
+                cout << format("{}: ioctl okay\n", i.name);
+        }
+    }
+}
+
 int main(int argc, char* argv[]) {
     try {
+        do_ioctl_tests();
+
         auto iou = init_io_uring();
 
         for (int i = 1; i < argc; i++) {
