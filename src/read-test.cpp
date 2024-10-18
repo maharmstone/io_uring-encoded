@@ -97,136 +97,6 @@ static unique_fd init_io_uring() {
     return iou;
 }
 
-static void ioctl_read_test(const string& fn) {
-    int ret;
-    unique_fd fd;
-    char buf[131072];
-    struct iovec iov;
-    btrfs_ioctl_encoded_io_args enc;
-
-    ret = open(fn.c_str(), O_RDONLY | O_DIRECT);
-    if (ret < 0)
-        throw runtime_error("open failed");
-    fd.reset(ret);
-
-    iov.iov_base = buf;
-    iov.iov_len = sizeof(buf);
-
-    enc.iov = &iov;
-    enc.iovcnt = 1;
-    enc.offset = 0;
-    enc.flags = 0;
-
-    ret = ioctl(fd.get(), BTRFS_IOC_ENCODED_READ, &enc);
-
-    cout << format("ret = {}, errno = {}\n", ret, errno);
-
-    if (ret < 0)
-        return;
-
-    cout << format("len {}, unencoded_len {}, unencoded_offset {}, compression {}, encryption {}\n",
-                   enc.len, enc.unencoded_len, enc.unencoded_offset, enc.compression, enc.encryption);
-
-    // FIXME
-}
-
-static void io_uring_read_test(int iou, const string& fn) {
-    int ret;
-    unique_fd fd;
-    unsigned int tail, next_tail, index;
-
-    ret = open(fn.c_str(), O_RDONLY | O_DIRECT);
-    if (ret < 0)
-        throw runtime_error("open failed");
-    fd.reset(ret);
-
-    auto size = file_size(fd.get());
-
-    unsigned int num_blocks = size / READ_BLOCK_SIZE;
-
-    if (size % READ_BLOCK_SIZE)
-        num_blocks++;
-
-    cout << format("fd = {}, file size = {}, num_blocks = {}\n",
-                   fd.get(), size, num_blocks);
-
-    auto ctx = new read_ctx;
-
-    {
-        tail = *sring_tail;
-        next_tail = tail + 1;
-
-        read_barrier();
-        index = tail & *sring_mask;
-
-        ctx->iov.iov_base = ctx->buf;
-        ctx->iov.iov_len = sizeof(ctx->buf);
-
-        ctx->enc.iov = &ctx->iov;
-        ctx->enc.iovcnt = 1;
-        ctx->enc.offset = 0;
-        ctx->enc.flags = 0;
-
-        auto& sqe = sqes[index];
-        sqe.fd = fd.get();
-        sqe.flags = 0;
-        sqe.opcode = IORING_OP_URING_CMD;
-        sqe.addr = (uintptr_t)&ctx->enc;
-        sqe.len = sizeof(ctx->enc);
-        sqe.cmd_op = BTRFS_IOC_ENCODED_READ;
-        sqe.user_data = (uintptr_t)ctx;
-
-        sring_array[index] = index;
-        tail = next_tail;
-
-
-        if (*sring_tail != tail) {
-            *sring_tail = tail;
-            write_barrier();
-        }
-    }
-
-    ret = io_uring_enter(iou, 1, 0, 0, nullptr);
-    if (ret < 0)
-        throw runtime_error("io_uring_enter failed");
-
-    cout << "sent" << endl;
-    fflush(stdout);
-}
-
-static void read_from_cq() {
-    unsigned int head = *cring_head;
-
-    do {
-        read_barrier();
-
-        if (head == *cring_tail)
-            break;
-
-        const auto& cqe = cqes[head & *cring_mask];
-
-        cout << format("cqe.res = {}, cqe.user_data = 0x{:x}\n", cqe.res, cqe.user_data);
-
-        if (cqe.user_data) {
-            auto& ctx = *(read_ctx*)cqe.user_data;
-
-            cout << format("len {}, unencoded_len {}, unencoded_offset {}, compression {}, encryption {}\n",
-                           ctx.enc.len, ctx.enc.unencoded_len, ctx.enc.unencoded_offset,
-                           ctx.enc.compression, ctx.enc.encryption);
-
-            if (cqe.res >= 0)
-                cout << string_view(ctx.buf, cqe.res) << endl;
-
-            delete &ctx;
-        }
-
-        head++;
-    } while (true);
-
-    *cring_head = head;
-    write_barrier();
-}
-
 extern uint8_t dump_normal;
 extern uint64_t dump_normal_length;
 extern uint8_t dump_zlib;
@@ -284,10 +154,10 @@ static void do_ioctl_tests() {
 
         if (ret < 0)
             cerr << format("{}: ioctl failed (ret {}, errno {})\n", i.name, ret, errno);
-        else if (ret != i.data.size())
+        else if ((size_t)ret != i.data.size())
             cerr << format("{}: ioctl returned {}, expected {}\n", i.name, ret, i.data.size());
 
-        if (ret == i.data.size()) {
+        if ((size_t)ret == i.data.size()) {
             bool okay = true;
 
             if (enc.len != i.len) {
@@ -391,7 +261,7 @@ static void cq_encoded_read(int iou, const test_item& i) {
 
         if (cqe.res < 0)
             cerr << format("{}: io_uring failed (res {})\n", i.name, cqe.res);
-        else if (cqe.res != i.data.size())
+        else if ((size_t)cqe.res != i.data.size())
             cerr << format("{}: io_uring returned {}, expected {}\n", i.name, cqe.res, i.data.size());
 
         if (!cqe.user_data)
@@ -399,7 +269,7 @@ static void cq_encoded_read(int iou, const test_item& i) {
         else {
             auto& ctx = *(read_ctx*)cqe.user_data;
 
-            if (cqe.res == i.data.size()) {
+            if ((size_t)cqe.res == i.data.size()) {
                 const auto& enc = ctx.enc;
                 bool okay = true;
 
@@ -459,27 +329,10 @@ static void do_io_uring_tests() {
     }
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     try {
         do_ioctl_tests();
         do_io_uring_tests();
-
-        auto iou = init_io_uring();
-
-        for (int i = 1; i < argc; i++) {
-            ioctl_read_test(argv[i]);
-
-            io_uring_read_test(iou.get(), argv[i]);
-
-            cout << "waiting" << endl;
-            fflush(stdout);
-
-            auto ret = io_uring_enter(iou.get(), 0, 1, IORING_ENTER_GETEVENTS, nullptr);
-            if (ret < 0)
-                throw runtime_error("io_uring_enter failed");
-
-            read_from_cq();
-        }
     } catch (const exception& e) {
         cerr << "Error: " << e.what() << endl;
     }
