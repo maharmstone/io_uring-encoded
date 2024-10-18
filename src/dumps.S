@@ -22,3 +22,13 @@ dump "../inline", dump_inline
 dump "../inline-zlib", dump_inline_zlib
 dump "../inline-lzo", dump_inline_lzo
 dump "../inline-zstd", dump_inline_zstd
+
+.global dump_zero_sector
+dump_zero_sector:
+.space 4096
+dump_zero_sector_end:
+
+.p2align 3
+.global dump_zero_sector_length
+dump_zero_sector_length:
+.quad dump_zero_sector_end - dump_zero_sector
