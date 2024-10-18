@@ -321,9 +321,148 @@ static void do_ioctl_tests() {
     }
 }
 
+static void sq_encoded_read(int iou, int fd) {
+    int ret;
+    unsigned int tail, next_tail, index;
+
+    auto size = file_size(fd);
+
+    unsigned int num_blocks = size / READ_BLOCK_SIZE;
+
+    if (size % READ_BLOCK_SIZE)
+        num_blocks++;
+
+    auto ctx = new read_ctx;
+
+    {
+        tail = *sring_tail;
+        next_tail = tail + 1;
+
+        read_barrier();
+        index = tail & *sring_mask;
+
+        ctx->iov.iov_base = ctx->buf;
+        ctx->iov.iov_len = sizeof(ctx->buf);
+
+        ctx->enc.iov = &ctx->iov;
+        ctx->enc.iovcnt = 1;
+        ctx->enc.offset = 0;
+        ctx->enc.flags = 0;
+
+        auto& sqe = sqes[index];
+        sqe.fd = fd;
+        sqe.flags = 0;
+        sqe.opcode = IORING_OP_URING_CMD;
+        sqe.addr = (uintptr_t)&ctx->enc;
+        sqe.len = sizeof(ctx->enc);
+        sqe.cmd_op = BTRFS_IOC_ENCODED_READ;
+        sqe.user_data = (uintptr_t)ctx;
+
+        sring_array[index] = index;
+        tail = next_tail;
+
+        if (*sring_tail != tail) {
+            *sring_tail = tail;
+            write_barrier();
+        }
+    }
+
+    ret = io_uring_enter(iou, 1, 0, 0, nullptr);
+    if (ret < 0) {
+        delete ctx;
+        throw runtime_error("io_uring_enter failed");
+    }
+}
+
+static void cq_encoded_read(int iou, const test_item& i) {
+    auto ret = io_uring_enter(iou, 0, 1, IORING_ENTER_GETEVENTS, nullptr);
+    if (ret < 0)
+        throw runtime_error("io_uring_enter failed");
+
+    unsigned int head = *cring_head;
+
+    do {
+        read_barrier();
+
+        if (head == *cring_tail)
+            break;
+
+        const auto& cqe = cqes[head & *cring_mask];
+
+        if (cqe.res < 0)
+            cerr << format("{}: io_uring failed (res {})\n", i.name, cqe.res);
+        else if (cqe.res != i.data.size())
+            cerr << format("{}: io_uring returned {}, expected {}\n", i.name, cqe.res, i.data.size());
+
+        if (!cqe.user_data)
+            cerr << format("{}: no user_data provided\n", i.name);
+        else {
+            auto& ctx = *(read_ctx*)cqe.user_data;
+
+            if (cqe.res == i.data.size()) {
+                const auto& enc = ctx.enc;
+                bool okay = true;
+
+                if (enc.len != i.len) {
+                    cerr << format("{}: io_uring enc.len was {}, expected {}\n", i.name, enc.len, i.len);
+                    okay = false;
+                }
+
+                if (enc.unencoded_len != i.unencoded_len) {
+                    cerr << format("{}: io_uring enc.unencoded_len was {}, expected {}\n", i.name, enc.unencoded_len, i.unencoded_len);
+                    okay = false;
+                }
+
+                if (enc.unencoded_offset != i.unencoded_offset) {
+                    cerr << format("{}: io_uring enc.unencoded_offset was {}, expected {}\n", i.name, enc.unencoded_offset, i.unencoded_offset);
+                    okay = false;
+                }
+
+                if (enc.compression != i.compression) {
+                    cerr << format("{}: io_uring enc.compression was {}, expected {}\n", i.name, enc.compression, i.compression);
+                    okay = false;
+                }
+
+                if (enc.encryption != 0) {
+                    cerr << format("{}: io_uring enc.encryption was {}, expected 0\n", i.name, enc.encryption);
+                    okay = false;
+                }
+
+                if (okay)
+                    cout << format("{}: io_uring okay\n", i.name);
+            }
+
+            delete &ctx;
+        }
+
+        head++;
+    } while (true);
+
+    *cring_head = head;
+    write_barrier();
+}
+
+static void do_io_uring_tests() {
+    auto iou = init_io_uring();
+
+    for (const auto& i : test_items) {
+        int ret;
+        unique_fd fd;
+
+        ret = open(i.name, O_RDONLY | O_DIRECT);
+        if (ret < 0)
+            throw runtime_error("open failed");
+        fd.reset(ret);
+
+        sq_encoded_read(iou.get(), fd.get());
+        cq_encoded_read(iou.get(), i);
+    }
+}
+
 int main(int argc, char* argv[]) {
     try {
         do_ioctl_tests();
+        do_io_uring_tests();
 
         auto iou = init_io_uring();
 
