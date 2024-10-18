@@ -185,6 +185,11 @@ static void do_ioctl_tests() {
                 okay = false;
             }
 
+            if (memcmp(buf, i.data.data(), i.data.size())) {
+                cerr << format("{}: ioctl data doesn't match what was expected\n", i.name);
+                okay = false;
+            }
+
             if (okay)
                 cout << format("{}: ioctl okay\n", i.name);
         }
@@ -295,6 +300,11 @@ static void cq_encoded_read(int iou, const test_item& i) {
 
                 if (enc.encryption != 0) {
                     cerr << format("{}: io_uring enc.encryption was {}, expected 0\n", i.name, enc.encryption);
+                    okay = false;
+                }
+
+                if (memcmp(ctx.buf, i.data.data(), i.data.size())) {
+                    cerr << format("{}: ioctl data doesn't match what was expected\n", i.name);
                     okay = false;
                 }
 
