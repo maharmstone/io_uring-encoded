@@ -51,3 +51,13 @@ dump_inline_end:
 .global dump_inline_length
 dump_inline_length:
 .quad dump_inline_end - dump_inline
+
+.global dump_inline_zlib
+dump_inline_zlib:
+.incbin "../inline-zlib"
+dump_inline_zlib_end:
+
+.p2align 3
+.global dump_inline_zlib_length
+dump_inline_zlib_length:
+.quad dump_inline_zlib_end - dump_inline_zlib
