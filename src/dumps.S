@@ -61,3 +61,13 @@ dump_inline_zlib_end:
 .global dump_inline_zlib_length
 dump_inline_zlib_length:
 .quad dump_inline_zlib_end - dump_inline_zlib
+
+.global dump_inline_lzo
+dump_inline_lzo:
+.incbin "../inline-lzo"
+dump_inline_lzo_end:
+
+.p2align 3
+.global dump_inline_lzo_length
+dump_inline_lzo_length:
+.quad dump_inline_lzo_end - dump_inline_lzo
