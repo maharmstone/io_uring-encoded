@@ -21,3 +21,4 @@ dump "../zstd", dump_zstd
 dump "../inline", dump_inline
 dump "../inline-zlib", dump_inline_zlib
 dump "../inline-lzo", dump_inline_lzo
+dump "../inline-zstd", dump_inline_zstd
