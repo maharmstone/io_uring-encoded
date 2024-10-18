@@ -105,6 +105,8 @@ extern uint8_t dump_lzo;
 extern uint64_t dump_lzo_length;
 extern uint8_t dump_zstd;
 extern uint64_t dump_zstd_length;
+extern uint8_t dump_inline;
+extern uint64_t dump_inline_length;
 
 static constexpr uint64_t round_up(uint64_t n) {
     if (n & 0xfff)
@@ -126,7 +128,8 @@ static const test_item test_items[] = {
     { "normal.txt", span(&dump_normal, dump_normal_length), dump_normal_length, dump_normal_length, 0, 0 },
     { "zlib.txt", span(&dump_zlib, dump_zlib_length), dump_normal_length, round_up(dump_normal_length), 0, 1 },
     { "lzo.txt", span(&dump_lzo, dump_lzo_length), dump_normal_length, round_up(dump_normal_length), 0, 3 },
-    { "zstd.txt", span(&dump_zstd, dump_zstd_length), dump_normal_length, round_up(dump_normal_length), 0, 2 }
+    { "zstd.txt", span(&dump_zstd, dump_zstd_length), dump_normal_length, round_up(dump_normal_length), 0, 2 },
+    { "inline.txt", span(&dump_inline, dump_inline_length), dump_inline_length, dump_inline_length, 0, 0 },
 };
 
 static void do_ioctl_tests() {

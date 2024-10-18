@@ -41,3 +41,13 @@ dump_zstd_end:
 .global dump_zstd_length
 dump_zstd_length:
 .quad dump_zstd_end - dump_zstd
+
+.global dump_inline
+dump_inline:
+.incbin "../inline"
+dump_inline_end:
+
+.p2align 3
+.global dump_inline_length
+dump_inline_length:
+.quad dump_inline_end - dump_inline
