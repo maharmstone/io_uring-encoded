@@ -8,3 +8,5 @@ enable_language(ASM)
 
 add_executable(read-test src/read-test.cpp
     src/dumps.S)
+
+add_executable(write-test src/write-test.cpp)
