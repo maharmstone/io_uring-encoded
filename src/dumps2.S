@@ -14,4 +14,5 @@
     .quad \name\()_end - \name
 .endm
 
+dump "../normal", dump_normal
 dump "../bookend-zstd", dump_bookend_zstd
