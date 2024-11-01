@@ -21,6 +21,7 @@ dump "../zstd", dump_zstd
 dump "../inline", dump_inline
 dump "../inline-zlib", dump_inline_zlib
 dump "../inline-lzo", dump_inline_lzo
+dump "../inline-zstd", dump_inline_zstd
 dump "../bookend-zlib", dump_bookend_zlib
 dump "../bookend-lzo", dump_bookend_lzo
 dump "../bookend-zstd", dump_bookend_zstd
