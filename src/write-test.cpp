@@ -18,6 +18,10 @@ extern uint8_t dump_lzo;
 extern uint64_t dump_lzo_length;
 extern uint8_t dump_zstd;
 extern uint64_t dump_zstd_length;
+extern uint8_t dump_inline;
+extern uint64_t dump_inline_length;
+extern uint8_t dump_inline_zlib;
+extern uint64_t dump_inline_zlib_length;
 extern uint8_t dump_bookend_zlib;
 extern uint64_t dump_bookend_zlib_length;
 extern uint8_t dump_bookend_lzo;
@@ -45,6 +49,7 @@ static const test_item test_items[] = {
     { "zlib.txt", span(&dump_zlib, dump_zlib_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
     { "lzo.txt", span(&dump_lzo, dump_lzo_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
     { "zstd.txt", span(&dump_zstd, dump_zstd_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
+    { "inline-zlib.txt", span(&dump_inline_zlib, dump_inline_zlib_length), dump_inline_length, dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
     { "bookend-zlib.txt", span(&dump_bookend_zlib, dump_bookend_zlib_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
     { "bookend-lzo.txt", span(&dump_bookend_lzo, dump_bookend_lzo_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
     { "bookend-zstd.txt", span(&dump_bookend_zstd, dump_bookend_zstd_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
