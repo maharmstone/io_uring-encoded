@@ -15,4 +15,5 @@
 .endm
 
 dump "../normal", dump_normal
+dump "../bookend-zlib", dump_bookend_zlib
 dump "../bookend-zstd", dump_bookend_zstd
