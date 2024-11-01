@@ -78,10 +78,19 @@ static void do_ioctl_tests() {
 
         ret = ioctl(fd.get(), BTRFS_IOC_ENCODED_WRITE, &enc);
 
-        cout << "ret = " << ret << " (errno = " << errno << ")" << endl;
+        if (ret < 0)
+            cerr << format("{}: ioctl failed (ret {}, errno {})\n", i.name, ret, errno);
+        else if ((size_t)ret != i.data.size())
+            cerr << format("{}: ioctl returned {}, expected {}\n", i.name, ret, i.data.size());
 
-        // FIXME - check ret
-        // FIXME - contents of file
+        if ((size_t)ret == i.data.size()) {
+            bool okay = true;
+
+            // FIXME - contents of file
+
+            if (okay)
+                cout << format("{}: ioctl okay\n", i.name);
+        }
     }
 }
 
