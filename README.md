@@ -1,9 +1,9 @@
-io_uring btrfs encoded reads
-============================
+io_uring btrfs encoded I/O
+==========================
 
-This is a test program for btrfs encoded reads, demonstrating that the new
+This is a test program for btrfs encoded I/O, demonstrating that the new
 io_uring interface produces the same results as the existing BTRFS_IOC_ENCODED_READ
-ioctl.
+and BTRFS_IOC_ENCODED_WRITE ioctls.
 
 To compile this you will need to have CMake and a recent version of GCC installed,
 as well as the kernel headers and liburing. We're controlling io_uring manually
@@ -14,6 +14,12 @@ files that it provides.
 $ mkdir build
 $ cd build
 $ cmake ..
+$ make
+```
+
+Read test
+---------
+```
 $ sudo btrfs receive . < ../stream
 $ cd subvol
 $ sudo ../read-test
@@ -39,6 +45,34 @@ inline-zlib.txt: io_uring okay
 inline-lzo.txt: io_uring okay
 inline-zstd.txt: io_uring okay
 prealloc.txt: io_uring okay
+```
+
+Write test
+----------
+```
+$ sudo ./write-test
+```
+
+You should see:
+```
+zlib.txt: ioctl okay
+lzo.txt: ioctl okay
+zstd.txt: ioctl okay
+inline-zlib.txt: ioctl okay
+inline-lzo.txt: ioctl okay
+inline-zstd.txt: ioctl okay
+bookend-zlib.txt: ioctl okay
+bookend-lzo.txt: ioctl okay
+bookend-zstd.txt: ioctl okay
+zlib.txt: io_uring okay
+lzo.txt: io_uring okay
+zstd.txt: io_uring okay
+inline-zlib.txt: io_uring okay
+inline-lzo.txt: io_uring okay
+inline-zstd.txt: io_uring okay
+bookend-zlib.txt: io_uring okay
+bookend-lzo.txt: io_uring okay
+bookend-zstd.txt: io_uring okay
 ```
 
 Both the ioctl and io_uring interfaces require CAP_SYS_ADMIN (root), as
