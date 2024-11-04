@@ -7,7 +7,6 @@
 #include <btrfs/ioctl.h>
 #include "unique_fd.h"
 
-static constexpr uint64_t READ_BLOCK_SIZE = 4096;
 static constexpr uint32_t QUEUE_DEPTH = 3;
 
 #define read_barrier()  __asm__ __volatile__("":::"memory")
@@ -214,13 +213,6 @@ static void do_ioctl_tests() {
 static void sq_encoded_read(int iou, int fd) {
     int ret;
     unsigned int tail, next_tail, index;
-
-    auto size = file_size(fd);
-
-    unsigned int num_blocks = size / READ_BLOCK_SIZE;
-
-    if (size % READ_BLOCK_SIZE)
-        num_blocks++;
 
     auto ctx = new read_ctx;
 
