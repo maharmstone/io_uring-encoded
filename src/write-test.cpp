@@ -43,22 +43,22 @@ static constexpr uint64_t round_up(uint64_t n) {
 struct test_item {
     const char* name;
     span<const uint8_t> data;
-    uint64_t len;
+    span<const uint8_t> unencoded_data;
     uint64_t unencoded_len;
     uint64_t unencoded_offset;
     uint32_t compression;
 };
 
 static const test_item test_items[] = {
-    { "zlib.txt", span(&dump_zlib, dump_zlib_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
-    { "lzo.txt", span(&dump_lzo, dump_lzo_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
-    { "zstd.txt", span(&dump_zstd, dump_zstd_length), dump_normal_length, round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
-    { "inline-zlib.txt", span(&dump_inline_zlib, dump_inline_zlib_length), dump_inline_length, dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
-    { "inline-lzo.txt", span(&dump_inline_lzo, dump_inline_lzo_length), dump_inline_length, dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
-    { "inline-zstd.txt", span(&dump_inline_zstd, dump_inline_zstd_length), dump_inline_length, dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
-    { "bookend-zlib.txt", span(&dump_bookend_zlib, dump_bookend_zlib_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
-    { "bookend-lzo.txt", span(&dump_bookend_lzo, dump_bookend_lzo_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
-    { "bookend-zstd.txt", span(&dump_bookend_zstd, dump_bookend_zstd_length), dump_normal_length, round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
+    { "zlib.txt", span(&dump_zlib, dump_zlib_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
+    { "lzo.txt", span(&dump_lzo, dump_lzo_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
+    { "zstd.txt", span(&dump_zstd, dump_zstd_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length), 0, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
+    { "inline-zlib.txt", span(&dump_inline_zlib, dump_inline_zlib_length), span(&dump_inline, dump_inline_length), dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
+    { "inline-lzo.txt", span(&dump_inline_lzo, dump_inline_lzo_length), span(&dump_inline, dump_inline_length), dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
+    { "inline-zstd.txt", span(&dump_inline_zstd, dump_inline_zstd_length), span(&dump_inline, dump_inline_length), dump_inline_length, 0, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
+    { "bookend-zlib.txt", span(&dump_bookend_zlib, dump_bookend_zlib_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZLIB },
+    { "bookend-lzo.txt", span(&dump_bookend_lzo, dump_bookend_lzo_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_LZO_4K },
+    { "bookend-zstd.txt", span(&dump_bookend_zstd, dump_bookend_zstd_length), span(&dump_normal, dump_normal_length), round_up(dump_normal_length) + 0x3000, 0x1000, BTRFS_ENCODED_IO_COMPRESSION_ZSTD },
 };
 
 static void do_ioctl_tests() {
@@ -70,7 +70,7 @@ static void do_ioctl_tests() {
 
         ret = open(i.name, O_CREAT | O_WRONLY, 0644);
         if (ret < 0)
-            throw runtime_error("open failed");
+            throw runtime_error("open failed for writing");
         fd.reset(ret);
 
         iov.iov_base = (void*)i.data.data();
@@ -80,7 +80,7 @@ static void do_ioctl_tests() {
         enc.iovcnt = 1;
         enc.offset = 0;
         enc.flags = 0;
-        enc.len = i.len;
+        enc.len = i.unencoded_data.size();
         enc.unencoded_len = i.unencoded_len;
         enc.unencoded_offset = i.unencoded_offset;
         enc.compression = i.compression;
@@ -96,8 +96,25 @@ static void do_ioctl_tests() {
 
         if ((size_t)ret == i.data.size()) {
             bool okay = true;
+            uint8_t buf[131072];
 
-            // FIXME - contents of file
+            fd.reset();
+
+            ret = open(i.name, O_RDONLY);
+            if (ret < 0)
+                throw runtime_error("open failed for reading");
+            fd.reset(ret);
+
+            ret = read(fd.get(), buf, i.unencoded_data.size());
+            if (ret < 0) {
+                throw runtime_error(format("{}: read returned {}, expected {}",
+                                           i.name, ret, i.unencoded_data.size()));
+            }
+
+            if (memcmp(i.unencoded_data.data(), buf, i.unencoded_data.size())) {
+                cerr << format("{}: file contents differ\n", i.name);
+                okay = false;
+            }
 
             if (okay)
                 cout << format("{}: ioctl okay\n", i.name);
