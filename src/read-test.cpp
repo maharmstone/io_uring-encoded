@@ -151,7 +151,7 @@ static void do_ioctl_tests() {
         struct iovec iov;
         btrfs_ioctl_encoded_io_args enc;
 
-        ret = open(i.name, O_RDONLY | O_DIRECT);
+        ret = open(i.name, O_RDONLY);
         if (ret < 0)
             throw runtime_error("open failed");
         fd.reset(ret);
@@ -336,7 +336,7 @@ static void do_io_uring_tests() {
         int ret;
         unique_fd fd;
 
-        ret = open(i.name, O_RDONLY | O_DIRECT);
+        ret = open(i.name, O_RDONLY);
         if (ret < 0)
             throw runtime_error("open failed");
         fd.reset(ret);
