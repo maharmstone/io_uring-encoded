@@ -14,14 +14,14 @@
     .quad \name\()_end - \name
 .endm
 
-dump "../normal", dump_normal
-dump "../zlib", dump_zlib
-dump "../lzo", dump_lzo
-dump "../zstd", dump_zstd
-dump "../inline", dump_inline
-dump "../inline-zlib", dump_inline_zlib
-dump "../inline-lzo", dump_inline_lzo
-dump "../inline-zstd", dump_inline_zstd
-dump "../bookend-zlib", dump_bookend_zlib
-dump "../bookend-lzo", dump_bookend_lzo
-dump "../bookend-zstd", dump_bookend_zstd
+dump "dumps/normal", dump_normal
+dump "dumps/zlib", dump_zlib
+dump "dumps/lzo", dump_lzo
+dump "dumps/zstd", dump_zstd
+dump "dumps/inline", dump_inline
+dump "dumps/inline-zlib", dump_inline_zlib
+dump "dumps/inline-lzo", dump_inline_lzo
+dump "dumps/inline-zstd", dump_inline_zstd
+dump "dumps/bookend-zlib", dump_bookend_zlib
+dump "dumps/bookend-lzo", dump_bookend_lzo
+dump "dumps/bookend-zstd", dump_bookend_zstd

@@ -8,6 +8,8 @@ enable_language(ASM)
 
 add_executable(read-test src/read-test.cpp
     src/dumps.S)
+target_include_directories(read-test PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(write-test src/write-test.cpp
     src/dumps2.S)
+target_include_directories(write-test PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
